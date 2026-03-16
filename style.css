@@ -939,6 +939,223 @@ html, body {
     display: none !important;
 }
 
+/* === CHALLENGE PROGRESSION === */
+.challenge-card.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border);
+    position: relative;
+}
+
+.challenge-card.locked:hover {
+    border-color: var(--border);
+    transform: none;
+}
+
+.challenge-card.completed {
+    border-color: var(--accent-green);
+    background: rgba(63,185,80,0.08);
+}
+
+.challenge-card.completed:hover {
+    border-color: var(--accent-green);
+}
+
+.challenge-card.completed h4 {
+    color: var(--accent-green);
+}
+
+.challenge-status {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+}
+
+.challenge-card.completed .challenge-status {
+    color: var(--accent-green);
+}
+
+.challenge-card.locked .challenge-status {
+    color: var(--accent-red);
+}
+
+.challenges-progress {
+    margin-bottom: 16px;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* === CHALLENGE BANNER === */
+#challenge-banner {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-yellow);
+    border-radius: var(--radius);
+    padding: 8px 16px;
+    box-shadow: var(--shadow);
+    max-width: 600px;
+    width: auto;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.banner-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.banner-text strong {
+    font-size: 13px;
+    color: var(--accent-yellow);
+}
+
+.banner-text span {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+#banner-cancel {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+}
+
+#banner-cancel:hover {
+    color: var(--accent-red);
+}
+
+/* === SUCCESS MODAL === */
+.success-modal {
+    text-align: center;
+    max-width: 440px;
+    padding: 32px 24px;
+}
+
+.success-icon {
+    font-size: 64px;
+    margin-bottom: 12px;
+    animation: successBounce 0.6s ease;
+}
+
+@keyframes successBounce {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    70% { transform: scale(0.95); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.success-modal h3 {
+    color: var(--accent-green);
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.success-name {
+    color: var(--accent-yellow);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.success-desc {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.success-progress {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--accent-cyan);
+    margin-bottom: 20px;
+    display: inline-block;
+}
+
+.success-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn-success-primary {
+    background: var(--accent-green);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-success-primary:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.btn-success-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-success-secondary:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
 /* Canvas component styling helper classes for JS */
 .glow-green { filter: drop-shadow(0 0 6px var(--accent-green)); }
 .glow-red { filter: drop-shadow(0 0 6px var(--accent-red)); }
