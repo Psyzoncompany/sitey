@@ -1274,10 +1274,9 @@
         state.selectedComponent = comp;
         showProperties(comp);
 
-        // Simple context: delete
-        if (confirm("Deseja excluir " + COMP_DEFS[comp.type].label + "?")) {
-          deleteComponent(comp);
-        }
+        // Delete via custom inline prompt
+        deleteComponent(comp);
+        logMessage("Componente excluído via menu de contexto", "warning");
         render();
       }
     });
@@ -1709,20 +1708,17 @@
           return;
         }
 
-        var coverage = (soldered / total * 100).toFixed(0);
-        var quality = soldered > 0 ? (goodQuality / soldered * 100).toFixed(0) : 0;
+        const coverage = (soldered / total * 100).toFixed(0);
+        const quality = soldered > 0 ? (goodQuality / soldered * 100).toFixed(0) : 0;
 
-        var msg = "📊 Resultado:\n";
-        msg += "Cobertura: " + coverage + "% (" + soldered + "/" + total + " pads)\n";
-        msg += "Qualidade: " + quality + "% dos pads com boa solda\n";
+        let grade = "❌ Ainda faltam pads para soldar.";
         if (coverage === "100" && parseInt(quality) > 70) {
-          msg += "🎉 Excelente trabalho!";
+          grade = "🎉 Excelente trabalho!";
         } else if (coverage === "100") {
-          msg += "⚠ Todos soldados, mas melhore a qualidade!";
-        } else {
-          msg += "❌ Ainda faltam pads para soldar.";
+          grade = "⚠ Todos soldados, mas melhore a qualidade!";
         }
 
+        const msg = `📊 Resultado:\nCobertura: ${coverage}% (${soldered}/${total} pads)\nQualidade: ${quality}% dos pads com boa solda\n${grade}`;
         if (statusEl) statusEl.textContent = msg;
       });
     }
