@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ ElectroLab — Laboratório Virtual de Eletrônica</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ===== BARRA SUPERIOR ===== -->
+    <header id="topbar">
+        <div class="topbar-left">
+            <span class="logo">⚡ ElectroLab</span>
+            <span class="subtitle">Laboratório Virtual de Eletrônica</span>
+        </div>
+        <nav class="topbar-modes">
+            <button class="mode-btn active" data-mode="explore" title="Laboratório livre">🔬 Explorar</button>
+            <button class="mode-btn" data-mode="lessons" title="Aulas guiadas">📖 Aulas</button>
+            <button class="mode-btn" data-mode="challenges" title="Desafios interativos">🏆 Desafios</button>
+            <button class="mode-btn" data-mode="projects" title="Projetos prontos">📁 Projetos</button>
+            <button class="mode-btn" data-mode="soldering" title="Modo soldagem">🔧 Soldagem</button>
+        </nav>
+        <div class="topbar-right">
+            <button id="btn-sim-start" title="Iniciar simulação">▶ Iniciar</button>
+            <button id="btn-sim-pause" title="Pausar" disabled>⏸ Pausar</button>
+            <button id="btn-sim-reset" title="Resetar">🔄 Reset</button>
+            <button id="btn-clear" title="Limpar tudo">🗑 Limpar</button>
+        </div>
+    </header>
+
+    <!-- ===== ÁREA PRINCIPAL ===== -->
+    <div id="main-container">
+        <!-- SIDEBAR: Componentes -->
+        <aside id="sidebar">
+            <h3>Componentes</h3>
+            <div id="component-search">
+                <input type="text" id="search-input" placeholder="Buscar componente...">
+            </div>
+            <div id="component-list">
+                <!-- Fontes -->
+                <div class="comp-category" data-cat="sources">
+                    <h4>⚡ Fontes</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="battery">🔋 Bateria DC</div>
+                        <div class="comp-item" draggable="true" data-type="ground">⏚ Terra (GND)</div>
+                        <div class="comp-item" draggable="true" data-type="switch">🔘 Chave Liga/Desliga</div>
+                        <div class="comp-item" draggable="true" data-type="pushbutton">⏺ Botão Pulsador</div>
+                    </div>
+                </div>
+                <!-- Passivos -->
+                <div class="comp-category" data-cat="passive">
+                    <h4>🔧 Passivos</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="resistor">⊟ Resistor</div>
+                        <div class="comp-item" draggable="true" data-type="potentiometer">🎛 Potenciômetro</div>
+                        <div class="comp-item" draggable="true" data-type="capacitor">⊞ Capacitor</div>
+                        <div class="comp-item" draggable="true" data-type="capacitor_pol">⊞ Capacitor Polarizado</div>
+                        <div class="comp-item" draggable="true" data-type="fuse">💥 Fusível</div>
+                    </div>
+                </div>
+                <!-- Semicondutores -->
+                <div class="comp-category" data-cat="semi">
+                    <h4>💡 Semicondutores</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="led">💡 LED</div>
+                        <div class="comp-item" draggable="true" data-type="lamp">💡 Lâmpada</div>
+                        <div class="comp-item" draggable="true" data-type="diode">▶| Diodo</div>
+                        <div class="comp-item" draggable="true" data-type="transistor_npn">🔺 Transistor NPN</div>
+                        <div class="comp-item" draggable="true" data-type="transistor_pnp">🔻 Transistor PNP</div>
+                    </div>
+                </div>
+                <!-- Eletromecânicos -->
+                <div class="comp-category" data-cat="electro">
+                    <h4>⚙ Eletromecânicos</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="relay">⚙ Relé</div>
+                        <div class="comp-item" draggable="true" data-type="buzzer">🔔 Buzzer</div>
+                    </div>
+                </div>
+                <!-- Lógica -->
+                <div class="comp-category" data-cat="logic">
+                    <h4>🧠 Lógica Digital</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="gate_and">AND</div>
+                        <div class="comp-item" draggable="true" data-type="gate_or">OR</div>
+                        <div class="comp-item" draggable="true" data-type="gate_not">NOT</div>
+                    </div>
+                </div>
+                <!-- Instrumentos -->
+                <div class="comp-category" data-cat="instruments">
+                    <h4>📏 Instrumentos</h4>
+                    <div class="comp-items">
+                        <div class="comp-item" draggable="true" data-type="voltmeter">🅥 Voltímetro</div>
+                        <div class="comp-item" draggable="true" data-type="ammeter">🅐 Amperímetro</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ÁREA DE CIRCUITO -->
+        <main id="workspace">
+            <canvas id="circuit-canvas"></canvas>
+            <!-- Mensagem de boas-vindas -->
+            <div id="welcome-overlay">
+                <div class="welcome-box">
+                    <h2>⚡ Bem-vindo ao ElectroLab!</h2>
+                    <p>Arraste componentes da barra lateral para a área de trabalho.<br>
+                    Conecte terminais clicando e arrastando entre eles.<br>
+                    Use os modos acima para explorar aulas, desafios e projetos.</p>
+                    <button id="welcome-close">Começar a Explorar</button>
+                </div>
+            </div>
+            <!-- Tooltip flutuante -->
+            <div id="tooltip" class="hidden"></div>
+        </main>
+
+        <!-- PAINEL LATERAL DIREITO -->
+        <aside id="right-panel">
+            <!-- Abas -->
+            <div class="panel-tabs">
+                <button class="panel-tab active" data-panel="properties">⚙ Propriedades</button>
+                <button class="panel-tab" data-panel="theory">📖 Teoria</button>
+                <button class="panel-tab" data-panel="multimeter">📏 Multímetro</button>
+            </div>
+            <!-- Propriedades -->
+            <div class="panel-content" id="panel-properties">
+                <p class="placeholder-text">Selecione um componente para ver suas propriedades.</p>
+                <div id="prop-details" class="hidden">
+                    <h4 id="prop-name"></h4>
+                    <div id="prop-fields"></div>
+                </div>
+            </div>
+            <!-- Teoria -->
+            <div class="panel-content hidden" id="panel-theory">
+                <div id="theory-content">
+                    <h4>📖 Conceitos de Eletrônica</h4>
+                    <p>Clique em um componente para ver a teoria relacionada, ou selecione um tópico abaixo:</p>
+                    <div id="theory-topics">
+                        <button class="theory-btn" data-topic="current">Corrente Elétrica</button>
+                        <button class="theory-btn" data-topic="voltage">Tensão</button>
+                        <button class="theory-btn" data-topic="resistance">Resistência</button>
+                        <button class="theory-btn" data-topic="capacitance">Capacitância</button>
+                        <button class="theory-btn" data-topic="power">Potência</button>
+                        <button class="theory-btn" data-topic="timeconstant">Constante de Tempo</button>
+                        <button class="theory-btn" data-topic="polarity">Polaridade</button>
+                        <button class="theory-btn" data-topic="series_parallel">Série/Paralelo</button>
+                        <button class="theory-btn" data-topic="transistor_func">Função do Transistor</button>
+                        <button class="theory-btn" data-topic="relay_func">Função do Relé</button>
+                        <button class="theory-btn" data-topic="soldering_func">Função da Solda</button>
+                        <button class="theory-btn" data-topic="digital_logic">Lógica Digital</button>
+                        <button class="theory-btn" data-topic="computers">Eletrônica &amp; Computadores</button>
+                    </div>
+                    <div id="theory-display"></div>
+                </div>
+            </div>
+            <!-- Multímetro -->
+            <div class="panel-content hidden" id="panel-multimeter">
+                <div id="multimeter">
+                    <h4>📏 Multímetro Virtual</h4>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-voltage">0.00 V</div>
+                        <div class="meter-label">Tensão</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-current">0.00 mA</div>
+                        <div class="meter-label">Corrente</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-resistance">0.00 Ω</div>
+                        <div class="meter-label">Resistência Eq.</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-power">0.00 W</div>
+                        <div class="meter-label">Potência</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-capacitance">0.00 µF</div>
+                        <div class="meter-label">Capacitância Eq.</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-charge">0.00 µC</div>
+                        <div class="meter-label">Carga do Capacitor</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-energy">0.00 µJ</div>
+                        <div class="meter-label">Energia Armazenada</div>
+                    </div>
+                    <div class="meter-display">
+                        <div class="meter-value" id="meter-tau">0.00 ms</div>
+                        <div class="meter-label">Constante de Tempo (τ)</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ===== PAINEL INFERIOR: Gráficos & Medições ===== -->
+    <div id="bottom-panel">
+        <div class="bottom-tabs">
+            <button class="bottom-tab active" data-btab="graphs">📊 Gráficos</button>
+            <button class="bottom-tab" data-btab="messages">💬 Mensagens</button>
+        </div>
+        <div class="bottom-content" id="btab-graphs">
+            <canvas id="graph-canvas"></canvas>
+            <div id="graph-controls">
+                <label><input type="radio" name="graph-type" value="voltage" checked> Tensão</label>
+                <label><input type="radio" name="graph-type" value="current"> Corrente</label>
+                <label><input type="radio" name="graph-type" value="charge"> Carga</label>
+                <button id="graph-clear">Limpar</button>
+            </div>
+        </div>
+        <div class="bottom-content hidden" id="btab-messages">
+            <div id="messages-log"></div>
+        </div>
+    </div>
+
+    <!-- ===== MODAIS ===== -->
+    <!-- Modal de Projetos -->
+    <div id="modal-projects" class="modal hidden">
+        <div class="modal-content large">
+            <button class="modal-close">&times;</button>
+            <h2>📁 Projetos Prontos</h2>
+            <p>Selecione um projeto para carregar na bancada:</p>
+            <div id="projects-grid"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Desafios -->
+    <div id="modal-challenges" class="modal hidden">
+        <div class="modal-content large">
+            <button class="modal-close">&times;</button>
+            <h2>🏆 Desafios Interativos</h2>
+            <p>Complete os desafios para testar seus conhecimentos:</p>
+            <div id="challenges-grid"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Aulas -->
+    <div id="modal-lessons" class="modal hidden">
+        <div class="modal-content large">
+            <button class="modal-close">&times;</button>
+            <h2>📖 Aulas de Eletrônica</h2>
+            <div id="lessons-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Soldagem -->
+    <div id="modal-soldering" class="modal hidden">
+        <div class="modal-content xlarge">
+            <button class="modal-close">&times;</button>
+            <h2>🔧 Modo Soldagem Educacional</h2>
+            <div id="soldering-workspace">
+                <canvas id="solder-canvas"></canvas>
+                <div id="solder-controls">
+                    <h4>Ferramentas</h4>
+                    <button class="solder-tool active" data-tool="iron">🔧 Ferro de Solda</button>
+                    <button class="solder-tool" data-tool="solder">🪛 Solda</button>
+                    <button class="solder-tool" data-tool="cutter">✂ Cortador</button>
+                    <button class="solder-tool" data-tool="inspect">🔍 Inspecionar</button>
+                    <hr>
+                    <h4>Status</h4>
+                    <div id="solder-status">Selecione um ponto para soldar</div>
+                    <hr>
+                    <h4>Dicas</h4>
+                    <div id="solder-tips">
+                        <p>• Aqueça o terminal, não a solda</p>
+                        <p>• Evite solda fria (brilhante = boa)</p>
+                        <p>• Cuidado com curtos entre trilhas</p>
+                        <p>• Respeite a polaridade dos componentes</p>
+                    </div>
+                    <hr>
+                    <button id="solder-reset">🔄 Resetar Placa</button>
+                    <button id="solder-check">✅ Verificar Soldagem</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
