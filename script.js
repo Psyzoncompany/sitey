@@ -43,9 +43,9 @@
   function loadProgress() {
     try {
       var data = JSON.parse(localStorage.getItem("electrolab_progress"));
-      return data || { completed: [], current: 0 };
+      return data || { completed: [] };
     } catch (e) {
-      return { completed: [], current: 0 };
+      return { completed: [] };
     }
   }
 
@@ -70,7 +70,6 @@
     var progress = loadProgress();
     if (progress.completed.indexOf(idx) === -1) {
       progress.completed.push(idx);
-      progress.current = Math.max(progress.current, idx + 1);
       saveProgress(progress);
     }
   }
@@ -1254,11 +1253,10 @@
         var allWires = getAllWires();
         if (allWires.length < 2) return false;
         if (!state.simRunning) return false;
-        // Check voltmeter reading or that current flows
-        var ammeters = state.components.filter(function (c) { return c.type === "ammeter"; });
-        var currentFlowing = ammeters.some(function (a) { return a.reading > 0; });
-        // Accept if current is flowing via ammeter, or just if wires exist with sim running
-        return allWires.length >= 2;
+        // Check that current is flowing through the circuit (voltmeter or ammeter reading, or wire current)
+        var hasCurrentFlow = state.wires.some(function (w) { return w.current > 0; });
+        var voltmeterReading = state.components.some(function (c) { return c.type === "voltmeter" && c.reading > 0; });
+        return hasCurrentFlow || voltmeterReading;
       },
     },
     {
@@ -2136,8 +2134,6 @@
         markChallengeCompleted(idx);
         logMessage("🎉 Parabéns! Desafio '" + state.currentChallenge.name + "' completado!", "success");
         showChallengeSuccess(idx);
-        state.currentChallenge = null;
-        state.currentChallengeIndex = -1;
       }
     }, 2000);
 
@@ -2206,6 +2202,10 @@
     }
 
     modal.classList.remove("hidden");
+
+    // Clear challenge state now that success is shown
+    state.currentChallenge = null;
+    state.currentChallengeIndex = -1;
 
     // Bind next challenge button
     var btnNext = document.getElementById("btn-next-challenge");
