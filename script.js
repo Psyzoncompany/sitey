@@ -225,16 +225,16 @@
       // Connect all terminals in this net (chain them)
       for (var t = 1; t < terminals.length; t++) {
         // Avoid duplicate of real wires
-        var a = terminals[0], b = terminals[t];
-        if (a.compId === b.compId) continue;
+        var firstTerminal = terminals[0], currentTerminal = terminals[t];
+        if (firstTerminal.compId === currentTerminal.compId) continue;
         var alreadyWired = state.wires.some(function (w) {
-          return (w.from.comp === a.compId && w.from.term === a.termId && w.to.comp === b.compId && w.to.term === b.termId) ||
-                 (w.from.comp === b.compId && w.from.term === b.termId && w.to.comp === a.compId && w.to.term === a.termId);
+          return (w.from.comp === firstTerminal.compId && w.from.term === firstTerminal.termId && w.to.comp === currentTerminal.compId && w.to.term === currentTerminal.termId) ||
+                 (w.from.comp === currentTerminal.compId && w.from.term === currentTerminal.termId && w.to.comp === firstTerminal.compId && w.to.term === firstTerminal.termId);
         });
         if (!alreadyWired) {
           virtualWires.push({
-            from: { comp: a.compId, term: a.termId },
-            to: { comp: b.compId, term: b.termId },
+            from: { comp: firstTerminal.compId, term: firstTerminal.termId },
+            to: { comp: currentTerminal.compId, term: currentTerminal.termId },
             current: 0,
             virtual: true,
           });
@@ -246,6 +246,7 @@
 
   function snapComponentToProtoboard(comp) {
     // Snap a component's first terminal to the nearest protoboard hole
+    if (!state.protoboardVisible) return;
     var terms = getTerminals(comp);
     if (terms.length === 0) return;
     var firstTerm = terms[0];
@@ -1488,7 +1489,7 @@
         var y = e.clientY - rect.top - COMPONENT_H / 2;
         var comp = createComponent(type, x, y);
         // Snap to protoboard hole if visible
-        if (comp && state.protoboardVisible) {
+        if (comp) {
           snapComponentToProtoboard(comp);
         }
         // Hide welcome overlay
@@ -1599,7 +1600,7 @@
     });
 
     canvas.addEventListener("mouseup", function () {
-      if (state.dragging && state.protoboardVisible) {
+      if (state.dragging) {
         snapComponentToProtoboard(state.dragging);
         render();
       }
