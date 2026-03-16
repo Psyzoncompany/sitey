@@ -36,7 +36,43 @@
     solderPoints: [],
     solderJoints: [],
     protoboardVisible: false,
+    currentChallengeIndex: -1,
   };
+
+  /* ──────────────── PROGRESSO (localStorage) ──────────────── */
+  function loadProgress() {
+    try {
+      var data = JSON.parse(localStorage.getItem("electrolab_progress"));
+      return data || { completed: [] };
+    } catch (e) {
+      return { completed: [] };
+    }
+  }
+
+  function saveProgress(progress) {
+    try {
+      localStorage.setItem("electrolab_progress", JSON.stringify(progress));
+    } catch (e) { /* ignore */ }
+  }
+
+  function isChallengeUnlocked(idx) {
+    if (idx === 0) return true;
+    var progress = loadProgress();
+    return progress.completed.indexOf(idx - 1) !== -1;
+  }
+
+  function isChallengeCompleted(idx) {
+    var progress = loadProgress();
+    return progress.completed.indexOf(idx) !== -1;
+  }
+
+  function markChallengeCompleted(idx) {
+    var progress = loadProgress();
+    if (progress.completed.indexOf(idx) === -1) {
+      progress.completed.push(idx);
+      saveProgress(progress);
+    }
+  }
 
   /* ──────────────── REFERÊNCIAS DOM ──────────────── */
   let canvas, ctx, graphCanvas, graphCtx, solderCanvas, solderCtx;
@@ -1189,55 +1225,96 @@
     {
       name: "Acenda o LED",
       difficulty: "⭐ Iniciante",
-      desc: "Monte um circuito para acender um LED usando uma bateria e um resistor.",
-      hint: "Conecte: Bateria → Resistor → LED",
+      desc: "Monte um circuito no protoboard para acender um LED usando uma bateria e um resistor. Inicie a simulação para validar!",
+      hint: "Conecte: Bateria → Resistor → LED no protoboard e clique ▶ Iniciar",
+      requiredComponents: ["battery", "resistor", "led"],
       check: function () {
         var has = { battery: false, resistor: false, led: false };
         state.components.forEach(function (c) { if (has.hasOwnProperty(c.type)) has[c.type] = true; });
-        return has.battery && has.resistor && has.led && state.wires.length >= 2;
+        if (!has.battery || !has.resistor || !has.led) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 2) return false;
+        // Must have simulation running and LED lit
+        if (!state.simRunning) return false;
+        var ledOn = state.components.some(function (c) { return c.type === "led" && c.brightness > 0; });
+        return ledOn;
       },
     },
     {
       name: "Divisor de Tensão",
       difficulty: "⭐ Iniciante",
-      desc: "Crie um divisor de tensão com dois resistores para obter metade da tensão da bateria.",
-      hint: "Use dois resistores de mesmo valor em série",
+      desc: "Crie um divisor de tensão com dois resistores e uma bateria. Use o voltímetro para medir!",
+      hint: "Use dois resistores de mesmo valor em série com a bateria e inicie a simulação",
+      requiredComponents: ["battery", "resistor", "resistor"],
       check: function () {
         var resistors = state.components.filter(function (c) { return c.type === "resistor"; });
-        return resistors.length >= 2 && state.components.some(function (c) { return c.type === "battery"; });
+        var hasBattery = state.components.some(function (c) { return c.type === "battery"; });
+        if (resistors.length < 2 || !hasBattery) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 2) return false;
+        if (!state.simRunning) return false;
+        // Check that current is flowing through the circuit (voltmeter or ammeter reading, or wire current)
+        var hasCurrentFlow = state.wires.some(function (w) { return w.current > 0; });
+        var voltmeterReading = state.components.some(function (c) { return c.type === "voltmeter" && c.reading > 0; });
+        return hasCurrentFlow || voltmeterReading;
       },
     },
     {
       name: "Circuito com Chave",
       difficulty: "⭐ Iniciante",
-      desc: "Monte um circuito com uma chave que liga e desliga uma lâmpada.",
-      hint: "Bateria → Chave → Lâmpada",
+      desc: "Monte um circuito com uma chave que liga e desliga uma lâmpada. Ligue a chave!",
+      hint: "Bateria → Chave → Lâmpada. Clique na chave durante simulação para ligar",
+      requiredComponents: ["battery", "switch", "lamp"],
       check: function () {
-        return state.components.some(function (c) { return c.type === "switch"; }) &&
-               state.components.some(function (c) { return c.type === "lamp"; }) &&
-               state.components.some(function (c) { return c.type === "battery"; });
+        var hasSwitch = state.components.some(function (c) { return c.type === "switch"; });
+        var hasLamp = state.components.some(function (c) { return c.type === "lamp"; });
+        var hasBattery = state.components.some(function (c) { return c.type === "battery"; });
+        if (!hasSwitch || !hasLamp || !hasBattery) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 2) return false;
+        if (!state.simRunning) return false;
+        var lampOn = state.components.some(function (c) { return c.type === "lamp" && c.brightness > 0; });
+        return lampOn;
       },
     },
     {
       name: "Proteção com Fusível",
       difficulty: "⭐⭐ Intermediário",
-      desc: "Adicione um fusível ao circuito para proteger contra sobrecorrente.",
-      hint: "Coloque o fusível em série com o circuito",
+      desc: "Adicione um fusível ao circuito com bateria e LED para proteger contra sobrecorrente.",
+      hint: "Coloque o fusível em série: Bateria → Fusível → Resistor → LED",
+      requiredComponents: ["battery", "fuse", "resistor", "led"],
       check: function () {
-        return state.components.some(function (c) { return c.type === "fuse"; }) &&
-               state.components.some(function (c) { return c.type === "battery"; }) &&
-               state.wires.length >= 2;
+        var hasFuse = state.components.some(function (c) { return c.type === "fuse"; });
+        var hasBattery = state.components.some(function (c) { return c.type === "battery"; });
+        var hasResistor = state.components.some(function (c) { return c.type === "resistor"; });
+        var hasLed = state.components.some(function (c) { return c.type === "led"; });
+        if (!hasFuse || !hasBattery || !hasResistor || !hasLed) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 3) return false;
+        if (!state.simRunning) return false;
+        var ledOn = state.components.some(function (c) { return c.type === "led" && c.brightness > 0; });
+        return ledOn;
       },
     },
     {
       name: "Carga do Capacitor",
       difficulty: "⭐⭐ Intermediário",
-      desc: "Monte um circuito RC e observe o capacitor carregando no gráfico.",
-      hint: "Use Bateria → Resistor → Capacitor e observe o gráfico de carga",
+      desc: "Monte um circuito RC (Resistor + Capacitor) e observe o capacitor carregando no gráfico.",
+      hint: "Bateria → Resistor → Capacitor. Observe a carga subir no gráfico!",
+      requiredComponents: ["battery", "resistor", "capacitor"],
       check: function () {
-        return state.components.some(function (c) { return c.type === "capacitor" || c.type === "capacitor_pol"; }) &&
-               state.components.some(function (c) { return c.type === "resistor"; }) &&
-               state.components.some(function (c) { return c.type === "battery"; });
+        var hasCap = state.components.some(function (c) { return c.type === "capacitor" || c.type === "capacitor_pol"; });
+        var hasResistor = state.components.some(function (c) { return c.type === "resistor"; });
+        var hasBattery = state.components.some(function (c) { return c.type === "battery"; });
+        if (!hasCap || !hasResistor || !hasBattery) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 2) return false;
+        if (!state.simRunning) return false;
+        // Check that capacitor has charged above a threshold
+        var capCharged = state.components.some(function (c) {
+          return (c.type === "capacitor" || c.type === "capacitor_pol") && c.charge > 1;
+        });
+        return capCharged;
       },
     },
     {
@@ -1245,10 +1322,17 @@
       difficulty: "⭐⭐⭐ Avançado",
       desc: "Use um transistor NPN para controlar um LED com um sinal de baixa corrente.",
       hint: "Aplique tensão na base do transistor para ativar o LED no coletor",
+      requiredComponents: ["battery", "transistor_npn", "led", "resistor"],
       check: function () {
-        return state.components.some(function (c) { return c.type === "transistor_npn"; }) &&
-               state.components.some(function (c) { return c.type === "led"; }) &&
-               state.components.some(function (c) { return c.type === "battery"; });
+        var hasTransistor = state.components.some(function (c) { return c.type === "transistor_npn"; });
+        var hasLed = state.components.some(function (c) { return c.type === "led"; });
+        var hasBattery = state.components.some(function (c) { return c.type === "battery"; });
+        if (!hasTransistor || !hasLed || !hasBattery) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 3) return false;
+        if (!state.simRunning) return false;
+        var ledOn = state.components.some(function (c) { return c.type === "led" && c.brightness > 0; });
+        return ledOn;
       },
     },
     {
@@ -1256,10 +1340,15 @@
       difficulty: "⭐⭐⭐ Avançado",
       desc: "Combine portas AND e NOT para criar uma função lógica NAND.",
       hint: "Conecte a saída de uma porta AND à entrada de uma porta NOT",
+      requiredComponents: ["gate_and", "gate_not"],
       check: function () {
-        return state.components.some(function (c) { return c.type === "gate_and"; }) &&
-               state.components.some(function (c) { return c.type === "gate_not"; }) &&
-               state.wires.length >= 1;
+        var hasAnd = state.components.some(function (c) { return c.type === "gate_and"; });
+        var hasNot = state.components.some(function (c) { return c.type === "gate_not"; });
+        if (!hasAnd || !hasNot) return false;
+        var allWires = getAllWires();
+        if (allWires.length < 1) return false;
+        if (!state.simRunning) return false;
+        return true;
       },
     },
   ];
@@ -1755,6 +1844,14 @@
         state.graphData = { voltage: [], current: [], charge: [] };
         updateMultimeter(0, 0, 0, []);
         showProperties(null);
+        // Cancel active challenge
+        if (state.currentChallenge) {
+          if (state.challengeCheckInterval) clearInterval(state.challengeCheckInterval);
+          state.currentChallenge = null;
+          state.currentChallengeIndex = -1;
+          var banner = document.getElementById("challenge-banner");
+          if (banner) banner.remove();
+        }
         logMessage("🗑 Bancada limpa!", "warning");
         render();
         drawGraph();
@@ -1847,6 +1944,10 @@
         document.getElementById("modal-lessons").classList.remove("hidden");
         break;
       case "challenges":
+        // Rebuild challenges to reflect current progress
+        var progressBar = document.querySelector(".challenges-progress");
+        if (progressBar) progressBar.remove();
+        setupChallenges();
         document.getElementById("modal-challenges").classList.remove("hidden");
         break;
       case "projects":
@@ -1940,19 +2041,48 @@
   function setupChallenges() {
     var grid = document.getElementById("challenges-grid");
     if (!grid) return;
+    grid.innerHTML = "";
+
+    // Add progress bar
+    var progress = loadProgress();
+    var totalChallenges = CHALLENGES.length;
+    var completedCount = progress.completed.length;
+    var progressPct = totalChallenges > 0 ? Math.round((completedCount / totalChallenges) * 100) : 0;
+
+    var progressBar = document.createElement("div");
+    progressBar.className = "challenges-progress";
+    progressBar.innerHTML =
+      '<div class="progress-header"><span>📊 Progresso: ' + completedCount + '/' + totalChallenges + ' desafios completos</span><span>' + progressPct + '%</span></div>' +
+      '<div class="progress-bar"><div class="progress-fill" style="width:' + progressPct + '%"></div></div>';
+    grid.parentElement.insertBefore(progressBar, grid);
 
     CHALLENGES.forEach(function (ch, idx) {
+      var unlocked = isChallengeUnlocked(idx);
+      var completed = isChallengeCompleted(idx);
+
       var card = document.createElement("div");
-      card.className = "challenge-card";
-      card.innerHTML = '<div class="difficulty">' + ch.difficulty + '</div><h4>' + ch.name + '</h4><p>' + ch.desc + '</p><p style="margin-top:6px;font-size:10px;color:#6e7681">💡 Dica: ' + ch.hint + '</p>';
-      card.addEventListener("click", function () {
-        startChallenge(idx);
-        document.getElementById("modal-challenges").classList.add("hidden");
-        document.querySelectorAll(".mode-btn").forEach(function (b) { b.classList.remove("active"); });
-        var exploreBtn = document.querySelector('.mode-btn[data-mode="explore"]');
-        if (exploreBtn) exploreBtn.classList.add("active");
-        state.mode = "explore";
-      });
+      card.className = "challenge-card" + (completed ? " completed" : "") + (!unlocked ? " locked" : "");
+
+      var statusIcon = completed ? "✅" : (unlocked ? "🔓" : "🔒");
+      var statusText = completed ? "Completo" : (unlocked ? "Disponível" : "Bloqueado");
+
+      card.innerHTML =
+        '<div class="challenge-status">' + statusIcon + ' ' + statusText + '</div>' +
+        '<div class="difficulty">' + ch.difficulty + '</div>' +
+        '<h4>' + ch.name + '</h4>' +
+        '<p>' + ch.desc + '</p>' +
+        '<p style="margin-top:6px;font-size:10px;color:#6e7681">💡 Dica: ' + ch.hint + '</p>';
+
+      if (unlocked) {
+        card.addEventListener("click", function () {
+          startChallenge(idx);
+          document.getElementById("modal-challenges").classList.add("hidden");
+          document.querySelectorAll(".mode-btn").forEach(function (b) { b.classList.remove("active"); });
+          var exploreBtn = document.querySelector('.mode-btn[data-mode="explore"]');
+          if (exploreBtn) exploreBtn.classList.add("active");
+          state.mode = "explore";
+        });
+      }
       grid.appendChild(card);
     });
   }
@@ -1961,31 +2091,147 @@
     var ch = CHALLENGES[idx];
     if (!ch) return;
 
+    // Stop any existing simulation
+    state.simRunning = false;
+    state.simPaused = false;
+    state.simTime = 0;
+    if (state.simInterval) { clearInterval(state.simInterval); state.simInterval = null; }
+    var btnStart = document.getElementById("btn-sim-start");
+    var btnPause = document.getElementById("btn-sim-pause");
+    if (btnStart) btnStart.disabled = false;
+    if (btnPause) { btnPause.disabled = true; btnPause.textContent = "⏸ Pausar"; }
+
     // Clear workspace
     state.components = [];
     state.wires = [];
     state.selectedComponent = null;
     state.nextId = 1;
+    state.currentChallengeIndex = idx;
+    state.graphData = { voltage: [], current: [], charge: [] };
+
+    // Auto-enable protoboard
+    state.protoboardVisible = true;
+    var btnProtoboard = document.getElementById("btn-protoboard");
+    if (btnProtoboard) btnProtoboard.classList.add("active");
 
     var overlay = document.getElementById("welcome-overlay");
     if (overlay) overlay.classList.add("hidden");
 
+    // Show active challenge banner
+    showChallengeBanner(ch, idx);
+
     logMessage("🏆 Desafio iniciado: " + ch.name, "info");
     logMessage("📋 Objetivo: " + ch.desc, "info");
     logMessage("💡 Dica: " + ch.hint, "info");
+    logMessage("🔲 Protoboard ativada automaticamente! Coloque os componentes no protoboard.", "info");
 
     // Set up periodic check
     state.currentChallenge = ch;
     if (state.challengeCheckInterval) clearInterval(state.challengeCheckInterval);
     state.challengeCheckInterval = setInterval(function () {
       if (state.currentChallenge && state.currentChallenge.check()) {
-        logMessage("🎉 Parabéns! Desafio '" + state.currentChallenge.name + "' completado!", "success");
         clearInterval(state.challengeCheckInterval);
-        state.currentChallenge = null;
+        markChallengeCompleted(idx);
+        logMessage("🎉 Parabéns! Desafio '" + state.currentChallenge.name + "' completado!", "success");
+        showChallengeSuccess(idx);
       }
     }, 2000);
 
     render();
+  }
+
+  function showChallengeBanner(ch, idx) {
+    // Remove existing banner
+    var existing = document.getElementById("challenge-banner");
+    if (existing) existing.remove();
+
+    var banner = document.createElement("div");
+    banner.id = "challenge-banner";
+    banner.innerHTML =
+      '<div class="banner-content">' +
+        '<span class="banner-icon">🏆</span>' +
+        '<div class="banner-text">' +
+          '<strong>Desafio ' + (idx + 1) + ': ' + ch.name + '</strong>' +
+          '<span>' + ch.hint + '</span>' +
+        '</div>' +
+        '<button id="banner-cancel" title="Cancelar desafio">✕</button>' +
+      '</div>';
+
+    var workspace = document.getElementById("workspace");
+    if (workspace) workspace.appendChild(banner);
+
+    document.getElementById("banner-cancel").addEventListener("click", function () {
+      if (state.challengeCheckInterval) clearInterval(state.challengeCheckInterval);
+      state.currentChallenge = null;
+      state.currentChallengeIndex = -1;
+      banner.remove();
+      logMessage("Desafio cancelado.", "warning");
+    });
+  }
+
+  function showChallengeSuccess(completedIdx) {
+    // Remove challenge banner
+    var banner = document.getElementById("challenge-banner");
+    if (banner) banner.remove();
+
+    // Show success modal
+    var modal = document.getElementById("modal-challenge-success");
+    if (!modal) return;
+
+    var ch = CHALLENGES[completedIdx];
+    var nextIdx = completedIdx + 1;
+    var hasNext = nextIdx < CHALLENGES.length;
+
+    var body = document.getElementById("success-body");
+    if (body) {
+      body.innerHTML =
+        '<div class="success-icon">🎉</div>' +
+        '<h3>Desafio Completo!</h3>' +
+        '<p class="success-name">' + ch.name + '</p>' +
+        '<p class="success-desc">Você completou o desafio com sucesso! ' +
+          (hasNext ? 'O próximo desafio já está desbloqueado.' : 'Parabéns, você completou todos os desafios!') +
+        '</p>' +
+        '<div class="success-progress">Progresso: ' + loadProgress().completed.length + '/' + CHALLENGES.length + ' desafios</div>' +
+        '<div class="success-actions">' +
+          (hasNext
+            ? '<button id="btn-next-challenge" class="btn-success-primary">▶ Próximo Desafio: ' + CHALLENGES[nextIdx].name + '</button>'
+            : '<button id="btn-next-challenge" class="btn-success-primary">🏆 Todos os Desafios Completos!</button>'
+          ) +
+          '<button id="btn-back-challenges" class="btn-success-secondary">📋 Ver Todos os Desafios</button>' +
+        '</div>';
+    }
+
+    modal.classList.remove("hidden");
+
+    // Clear challenge state now that success is shown
+    state.currentChallenge = null;
+    state.currentChallengeIndex = -1;
+
+    // Bind next challenge button
+    var btnNext = document.getElementById("btn-next-challenge");
+    if (btnNext && hasNext) {
+      btnNext.addEventListener("click", function () {
+        modal.classList.add("hidden");
+        startChallenge(nextIdx);
+      });
+    } else if (btnNext) {
+      btnNext.addEventListener("click", function () {
+        modal.classList.add("hidden");
+      });
+    }
+
+    // Bind back to challenges button
+    var btnBack = document.getElementById("btn-back-challenges");
+    if (btnBack) {
+      btnBack.addEventListener("click", function () {
+        modal.classList.add("hidden");
+        // Rebuild the challenges grid to reflect new states
+        var progressBar = document.querySelector(".challenges-progress");
+        if (progressBar) progressBar.remove();
+        setupChallenges();
+        document.getElementById("modal-challenges").classList.remove("hidden");
+      });
+    }
   }
 
   /* ──────────────── LESSONS SETUP ──────────────── */
