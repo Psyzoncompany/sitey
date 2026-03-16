@@ -144,6 +144,9 @@ html, body {
     cursor: not-allowed;
 }
 
+#btn-protoboard { border-color: var(--accent-orange); color: var(--accent-orange); }
+#btn-protoboard:hover { background: var(--accent-orange); color: #fff; }
+#btn-protoboard.active { background: var(--accent-orange); color: #fff; border-color: var(--accent-orange); }
 #btn-sim-start { border-color: var(--accent-green); color: var(--accent-green); }
 #btn-sim-start:hover { background: var(--accent-green); color: #fff; }
 #btn-sim-pause { border-color: var(--accent-yellow); color: var(--accent-yellow); }

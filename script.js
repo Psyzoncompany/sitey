@@ -35,6 +35,7 @@
     solderTool: "iron",
     solderPoints: [],
     solderJoints: [],
+    protoboardVisible: false,
   };
 
   /* ──────────────── REFERÊNCIAS DOM ──────────────── */
@@ -79,6 +80,326 @@
     el.className = "msg-item " + type;
     el.innerHTML = '<span class="msg-time">' + now() + '</span><span class="msg-text">' + text + "</span>";
     log.prepend(el);
+  }
+
+  /* ──────────────── PROTOBOARD LAYOUT ──────────────── */
+  var PROTO = {
+    startX: 60,
+    startY: 40,
+    holeSpacing: 20,
+    cols: 30,
+    topPowerRows: 2,
+    signalRowsPerHalf: 5,
+    bottomPowerRows: 2,
+    gapHeight: 16,
+    powerGap: 10,
+    holeRadius: 3,
+    boardPadding: 14,
+    boardColor: "#e8dcc8",
+    boardBorder: "#bfb09a",
+    holeColor: "#2a2a2a",
+    powerPlusColor: "#e05555",
+    powerMinusColor: "#4488dd",
+    railLineAlpha: 0.5,
+    rowLabels: ["a","b","c","d","e","f","g","h","i","j"],
+  };
+
+  function getProtoBoardRect() {
+    var p = PROTO;
+    var totalRows = p.topPowerRows + p.signalRowsPerHalf * 2 + p.bottomPowerRows;
+    var innerH = totalRows * p.holeSpacing + p.gapHeight + p.powerGap * 2;
+    var innerW = p.cols * p.holeSpacing;
+    return {
+      x: p.startX,
+      y: p.startY,
+      w: innerW + p.boardPadding * 2,
+      h: innerH + p.boardPadding * 2,
+      innerX: p.startX + p.boardPadding,
+      innerY: p.startY + p.boardPadding,
+      innerW: innerW,
+      innerH: innerH,
+    };
+  }
+
+  function getProtoHolePos(row, col) {
+    var p = PROTO;
+    var bx = p.startX + p.boardPadding;
+    var by = p.startY + p.boardPadding;
+    var x = bx + col * p.holeSpacing + p.holeSpacing / 2;
+    var y = by;
+
+    if (row < p.topPowerRows) {
+      // Top power rails
+      y += row * p.holeSpacing + p.holeSpacing / 2;
+    } else if (row < p.topPowerRows + p.signalRowsPerHalf) {
+      // Top signal rows (a-e)
+      y += p.topPowerRows * p.holeSpacing + p.powerGap + (row - p.topPowerRows) * p.holeSpacing + p.holeSpacing / 2;
+    } else if (row < p.topPowerRows + p.signalRowsPerHalf * 2) {
+      // Bottom signal rows (f-j)
+      var localRow = row - p.topPowerRows - p.signalRowsPerHalf;
+      y += p.topPowerRows * p.holeSpacing + p.powerGap + p.signalRowsPerHalf * p.holeSpacing + p.gapHeight + localRow * p.holeSpacing + p.holeSpacing / 2;
+    } else {
+      // Bottom power rails
+      var localRow2 = row - p.topPowerRows - p.signalRowsPerHalf * 2;
+      y += p.topPowerRows * p.holeSpacing + p.powerGap + p.signalRowsPerHalf * p.holeSpacing + p.gapHeight + p.signalRowsPerHalf * p.holeSpacing + p.powerGap + localRow2 * p.holeSpacing + p.holeSpacing / 2;
+    }
+    return { x: x, y: y };
+  }
+
+  function getProtoHoleAt(px, py) {
+    // Find the closest protoboard hole to a given canvas coordinate
+    var p = PROTO;
+    var totalRows = p.topPowerRows + p.signalRowsPerHalf * 2 + p.bottomPowerRows;
+    var bestDist = Infinity, bestRow = -1, bestCol = -1;
+
+    for (var r = 0; r < totalRows; r++) {
+      for (var c = 0; c < p.cols; c++) {
+        var pos = getProtoHolePos(r, c);
+        var d = Math.hypot(px - pos.x, py - pos.y);
+        if (d < bestDist) {
+          bestDist = d;
+          bestRow = r;
+          bestCol = c;
+        }
+      }
+    }
+
+    if (bestDist <= p.holeSpacing * 0.7) {
+      return { row: bestRow, col: bestCol };
+    }
+    return null;
+  }
+
+  function getProtoNet(row, col) {
+    // Return a net identifier for a protoboard hole.
+    // Holes in the same net are electrically connected.
+    var p = PROTO;
+    if (row < p.topPowerRows) {
+      // Top power rails: each row is connected horizontally across the whole board
+      return "tp" + row;
+    }
+    if (row >= p.topPowerRows + p.signalRowsPerHalf * 2) {
+      // Bottom power rails
+      var localRow = row - p.topPowerRows - p.signalRowsPerHalf * 2;
+      return "bp" + localRow;
+    }
+    // Signal rows: connected in groups of 5 per column (same column, within one half)
+    if (row < p.topPowerRows + p.signalRowsPerHalf) {
+      // Top half (a-e), connected per column
+      return "st" + col;
+    }
+    // Bottom half (f-j), connected per column
+    return "sb" + col;
+  }
+
+  function getProtoBreadboardWires() {
+    // Returns implicit connections from the protoboard.
+    // If two component terminals land on the same protoboard net, they are connected.
+    if (!state.protoboardVisible) return [];
+
+    var p = PROTO;
+    var totalRows = p.topPowerRows + p.signalRowsPerHalf * 2 + p.bottomPowerRows;
+
+    // Map each terminal to its protoboard net
+    var netMap = {}; // net -> [{ compId, termId, x, y }]
+
+    for (var i = 0; i < state.components.length; i++) {
+      var comp = state.components[i];
+      var terms = getTerminals(comp);
+      for (var j = 0; j < terms.length; j++) {
+        var hole = getProtoHoleAt(terms[j].x, terms[j].y);
+        if (hole) {
+          var net = getProtoNet(hole.row, hole.col);
+          if (!netMap[net]) netMap[net] = [];
+          netMap[net].push({ compId: comp.id, termId: terms[j].id, x: terms[j].x, y: terms[j].y });
+        }
+      }
+    }
+
+    // Generate virtual wires for terminals on the same net
+    var virtualWires = [];
+    var keys = Object.keys(netMap);
+    for (var k = 0; k < keys.length; k++) {
+      var terminals = netMap[keys[k]];
+      if (terminals.length < 2) continue;
+      // Connect all terminals in this net (chain them)
+      for (var t = 1; t < terminals.length; t++) {
+        // Avoid duplicate of real wires
+        var a = terminals[0], b = terminals[t];
+        if (a.compId === b.compId) continue;
+        var alreadyWired = state.wires.some(function (w) {
+          return (w.from.comp === a.compId && w.from.term === a.termId && w.to.comp === b.compId && w.to.term === b.termId) ||
+                 (w.from.comp === b.compId && w.from.term === b.termId && w.to.comp === a.compId && w.to.term === a.termId);
+        });
+        if (!alreadyWired) {
+          virtualWires.push({
+            from: { comp: a.compId, term: a.termId },
+            to: { comp: b.compId, term: b.termId },
+            current: 0,
+            virtual: true,
+          });
+        }
+      }
+    }
+    return virtualWires;
+  }
+
+  function snapComponentToProtoboard(comp) {
+    // Snap a component's first terminal to the nearest protoboard hole
+    var terms = getTerminals(comp);
+    if (terms.length === 0) return;
+    var firstTerm = terms[0];
+    var hole = getProtoHoleAt(firstTerm.x, firstTerm.y);
+    if (hole) {
+      var holePos = getProtoHolePos(hole.row, hole.col);
+      comp.x = snap(holePos.x - (firstTerm.x - comp.x));
+      comp.y = snap(holePos.y - (firstTerm.y - comp.y));
+    }
+  }
+
+  function drawProtoboard() {
+    if (!state.protoboardVisible || !ctx) return;
+    var p = PROTO;
+    var rect = getProtoBoardRect();
+    var totalRows = p.topPowerRows + p.signalRowsPerHalf * 2 + p.bottomPowerRows;
+
+    // Board body
+    ctx.save();
+    ctx.fillStyle = p.boardColor;
+    ctx.strokeStyle = p.boardBorder;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Center channel label
+    var channelY = rect.innerY + p.topPowerRows * p.holeSpacing + p.powerGap + p.signalRowsPerHalf * p.holeSpacing;
+    ctx.fillStyle = "#c8bca8";
+    ctx.fillRect(rect.innerX, channelY, rect.innerW, p.gapHeight);
+    ctx.strokeStyle = "#b0a48e";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.innerX, channelY, rect.innerW, p.gapHeight);
+
+    // Power rail lines (top)
+    for (var pr = 0; pr < p.topPowerRows; pr++) {
+      var lineY = getProtoHolePos(pr, 0).y;
+      ctx.beginPath();
+      ctx.moveTo(rect.innerX + 4, lineY);
+      ctx.lineTo(rect.innerX + rect.innerW - 4, lineY);
+      ctx.strokeStyle = pr === 0 ? "rgba(224,85,85," + p.railLineAlpha + ")" : "rgba(68,136,221," + p.railLineAlpha + ")";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Power rail lines (bottom)
+    for (var pr2 = 0; pr2 < p.bottomPowerRows; pr2++) {
+      var rowIdx = p.topPowerRows + p.signalRowsPerHalf * 2 + pr2;
+      var lineY2 = getProtoHolePos(rowIdx, 0).y;
+      ctx.beginPath();
+      ctx.moveTo(rect.innerX + 4, lineY2);
+      ctx.lineTo(rect.innerX + rect.innerW - 4, lineY2);
+      ctx.strokeStyle = pr2 === 0 ? "rgba(224,85,85," + p.railLineAlpha + ")" : "rgba(68,136,221," + p.railLineAlpha + ")";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Draw all holes
+    for (var r = 0; r < totalRows; r++) {
+      for (var c = 0; c < p.cols; c++) {
+        var pos = getProtoHolePos(r, c);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, p.holeRadius, 0, Math.PI * 2);
+        ctx.fillStyle = p.holeColor;
+        ctx.fill();
+      }
+    }
+
+    // Power rail +/- labels
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    var lx = rect.innerX - 4;
+    ctx.fillStyle = p.powerPlusColor;
+    ctx.fillText("+", lx, getProtoHolePos(0, 0).y);
+    ctx.fillStyle = p.powerMinusColor;
+    ctx.fillText("−", lx, getProtoHolePos(1, 0).y);
+    var bottomPlusRow = p.topPowerRows + p.signalRowsPerHalf * 2;
+    ctx.fillStyle = p.powerPlusColor;
+    ctx.fillText("+", lx, getProtoHolePos(bottomPlusRow, 0).y);
+    ctx.fillStyle = p.powerMinusColor;
+    ctx.fillText("−", lx, getProtoHolePos(bottomPlusRow + 1, 0).y);
+
+    // Row labels (a-e, f-j)
+    ctx.font = "9px sans-serif";
+    ctx.fillStyle = "#8a7e6e";
+    ctx.textAlign = "right";
+    for (var lr = 0; lr < p.signalRowsPerHalf * 2; lr++) {
+      var labelRow = p.topPowerRows + lr;
+      var labelPos = getProtoHolePos(labelRow, 0);
+      ctx.fillText(p.rowLabels[lr], lx, labelPos.y);
+    }
+
+    // Column numbers
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "8px sans-serif";
+    ctx.fillStyle = "#8a7e6e";
+    var colLabelY = rect.y + rect.h + 2;
+    for (var cl = 0; cl < p.cols; cl += 5) {
+      var colPos = getProtoHolePos(0, cl);
+      ctx.fillText(String(cl + 1), colPos.x, colLabelY);
+    }
+
+    // Title label
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.font = "bold 10px sans-serif";
+    ctx.fillStyle = "#8a7e6e";
+    ctx.fillText("PROTOBOARD", rect.x + 6, rect.y - 2);
+
+    // Highlight occupied holes
+    for (var ci = 0; ci < state.components.length; ci++) {
+      var comp = state.components[ci];
+      var terms = getTerminals(comp);
+      for (var ti = 0; ti < terms.length; ti++) {
+        var hole = getProtoHoleAt(terms[ti].x, terms[ti].y);
+        if (hole) {
+          var holePos = getProtoHolePos(hole.row, hole.col);
+          ctx.beginPath();
+          ctx.arc(holePos.x, holePos.y, p.holeRadius + 2, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(63,185,80,0.8)";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw virtual breadboard connections
+    var virtualWires = getProtoBreadboardWires();
+    if (virtualWires.length > 0) {
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "rgba(219,109,40,0.55)";
+      ctx.lineWidth = 1.5;
+      for (var vi = 0; vi < virtualWires.length; vi++) {
+        var vw = virtualWires[vi];
+        var fromComp = state.components.find(function (c) { return c.id === vw.from.comp; });
+        var toComp = state.components.find(function (c) { return c.id === vw.to.comp; });
+        if (!fromComp || !toComp) continue;
+        var fromTerms = getTerminals(fromComp);
+        var toTerms = getTerminals(toComp);
+        var ft = fromTerms.find(function (t) { return t.id === vw.from.term; });
+        var tt = toTerms.find(function (t) { return t.id === vw.to.term; });
+        if (!ft || !tt) continue;
+        ctx.beginPath();
+        ctx.moveTo(ft.x, ft.y);
+        ctx.lineTo(tt.x, tt.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
   }
 
   /* ──────────────── TERMINAL POSITIONS ──────────────── */
@@ -452,6 +773,7 @@
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid();
+    drawProtoboard();
     drawWires();
     drawWiringPreview();
     for (var i = 0; i < state.components.length; i++) {
@@ -463,6 +785,18 @@
   }
 
   /* ──────────────── SIMULAÇÃO ──────────────── */
+  function getAllWires() {
+    // Returns all effective wires: real wires + protoboard virtual connections
+    var allWires = state.wires.slice();
+    if (state.protoboardVisible) {
+      var virtualWires = getProtoBreadboardWires();
+      for (var i = 0; i < virtualWires.length; i++) {
+        allWires.push(virtualWires[i]);
+      }
+    }
+    return allWires;
+  }
+
   function simulate() {
     if (!state.simRunning || state.simPaused) return;
     state.simTime += 0.05;
@@ -501,7 +835,8 @@
     if (totalResistance < 1) totalResistance = 1;
 
     var current = 0;
-    if (hasSource && hasClosed && state.wires.length > 0) {
+    var effectiveWires = getAllWires();
+    if (hasSource && hasClosed && effectiveWires.length > 0) {
       current = (totalVoltage / totalResistance) * 1000; // mA
     }
 
@@ -1151,7 +1486,11 @@
         var rect = canvas.getBoundingClientRect();
         var x = e.clientX - rect.left - COMPONENT_W / 2;
         var y = e.clientY - rect.top - COMPONENT_H / 2;
-        createComponent(type, x, y);
+        var comp = createComponent(type, x, y);
+        // Snap to protoboard hole if visible
+        if (comp && state.protoboardVisible) {
+          snapComponentToProtoboard(comp);
+        }
         // Hide welcome overlay
         var overlay = document.getElementById("welcome-overlay");
         if (overlay) overlay.classList.add("hidden");
@@ -1260,6 +1599,10 @@
     });
 
     canvas.addEventListener("mouseup", function () {
+      if (state.dragging && state.protoboardVisible) {
+        snapComponentToProtoboard(state.dragging);
+        render();
+      }
       state.dragging = null;
     });
 
@@ -1325,6 +1668,17 @@
       welcomeClose.addEventListener("click", function () {
         var overlay = document.getElementById("welcome-overlay");
         if (overlay) overlay.classList.add("hidden");
+      });
+    }
+
+    // Protoboard toggle
+    var btnProtoboard = document.getElementById("btn-protoboard");
+    if (btnProtoboard) {
+      btnProtoboard.addEventListener("click", function () {
+        state.protoboardVisible = !state.protoboardVisible;
+        btnProtoboard.classList.toggle("active", state.protoboardVisible);
+        logMessage(state.protoboardVisible ? "🔲 Protoboard ativada!" : "🔲 Protoboard desativada", "info");
+        render();
       });
     }
 
